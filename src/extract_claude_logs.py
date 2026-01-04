@@ -377,6 +377,52 @@ class ClaudeConversationExtractor:
 
         return output_path
     
+    def _format_markdown_to_html(self, text: str) -> str:
+        """Convert markdown formatting to HTML with syntax highlighting support.
+
+        Handles:
+        - Code blocks with language-specific syntax highlighting
+        - Inline code spans
+        - Bold text
+        - Italic text
+        """
+        import re
+
+        # First escape HTML entities
+        text = text.replace("&", "&amp;")
+        text = text.replace("<", "&lt;")
+        text = text.replace(">", "&gt;")
+
+        # Handle code blocks with language specification (```language\ncode\n```)
+        def replace_code_block(match):
+            language = match.group(1) or ""
+            code = match.group(2)
+            # Unescape for code blocks since they're already escaped
+            code = code.replace("&amp;", "&").replace("&lt;", "<").replace("&gt;", ">")
+            lang_class = f' class="language-{language}"' if language else ""
+            return f'<pre><code{lang_class}>{code}</code></pre>'
+
+        text = re.sub(r'```(\w+)?\n(.*?)```', replace_code_block, text, flags=re.DOTALL)
+
+        # Handle inline code (`code`)
+        def replace_inline_code(match):
+            code = match.group(1)
+            # Unescape for inline code
+            code = code.replace("&amp;", "&").replace("&lt;", "<").replace("&gt;", ">")
+            return f'<code>{code}</code>'
+
+        text = re.sub(r'`([^`]+)`', replace_inline_code, text)
+
+        # Handle bold (**text** or __text__)
+        text = re.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', text)
+        text = re.sub(r'__(.+?)__', r'<strong>\1</strong>', text)
+
+        # Handle italic (*text* or _text_) - but not within words
+        text = re.sub(r'(?<!\w)\*(.+?)\*(?!\w)', r'<em>\1</em>', text)
+        text = re.sub(r'(?<!\w)_(.+?)_(?!\w)', r'<em>\1</em>', text)
+
+        return text
+
     def save_as_html(
         self, conversation: List[Dict[str, str]], session_id: str
     ) -> Optional[Path]:
@@ -401,13 +447,14 @@ class ClaudeConversationExtractor:
         filename = f"claude-conversation-{date_str}-{session_id[:8]}.html"
         output_path = self.output_dir / filename
 
-        # HTML template with modern styling
+        # HTML template with modern styling and Highlight.js
         html_content = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Claude Conversation - {session_id[:8]}</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css">
     <style>
         body {{
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -467,18 +514,39 @@ class ClaudeConversationExtractor:
         .content {{
             white-space: pre-wrap;
             word-wrap: break-word;
+            line-height: 1.5;
         }}
-        pre {{
-            background: #f4f4f4;
-            padding: 10px;
-            border-radius: 4px;
+        .content pre {{
+            background: #f6f8fa;
+            padding: 16px;
+            border-radius: 6px;
             overflow-x: auto;
+            margin: 10px 0;
+            border: 1px solid #e1e4e8;
         }}
-        code {{
-            background: #f4f4f4;
-            padding: 2px 4px;
+        .content pre code {{
+            background: transparent;
+            padding: 0;
+            border-radius: 0;
+            font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+            font-size: 0.9em;
+            line-height: 1.45;
+        }}
+        .content code {{
+            background: #f6f8fa;
+            padding: 2px 6px;
             border-radius: 3px;
-            font-family: 'Courier New', monospace;
+            font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+            font-size: 0.9em;
+            border: 1px solid #e1e4e8;
+        }}
+        .content strong {{
+            font-weight: 600;
+            color: #24292e;
+        }}
+        .content em {{
+            font-style: italic;
+            color: #24292e;
         }}
     </style>
 </head>
@@ -495,16 +563,14 @@ class ClaudeConversationExtractor:
 
         with open(output_path, "w", encoding="utf-8") as f:
             f.write(html_content)
-            
+
             for msg in conversation:
                 role = msg["role"]
                 content = msg["content"]
-                
-                # Escape HTML
-                content = content.replace("&", "&amp;")
-                content = content.replace("<", "&lt;")
-                content = content.replace(">", "&gt;")
-                
+
+                # Format markdown to HTML with syntax highlighting
+                formatted_content = self._format_markdown_to_html(content)
+
                 role_display = {
                     "user": "👤 User",
                     "assistant": "🤖 Claude",
@@ -512,13 +578,18 @@ class ClaudeConversationExtractor:
                     "tool_result": "📤 Tool Result",
                     "system": "ℹ️ System"
                 }.get(role, role)
-                
+
                 f.write(f'    <div class="message {role}">\n')
                 f.write(f'        <div class="role">{role_display}</div>\n')
-                f.write(f'        <div class="content">{content}</div>\n')
+                f.write(f'        <div class="content">{formatted_content}</div>\n')
                 f.write(f'    </div>\n')
-            
-            f.write("\n</body>\n</html>")
+
+            # Add Highlight.js script at the end for syntax highlighting
+            f.write("""
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <script>hljs.highlightAll();</script>
+</body>
+</html>""")
 
         return output_path
 
