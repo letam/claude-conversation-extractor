@@ -445,12 +445,71 @@ class ClaudeConversationExtractor:
 
         return text
 
+    def _detect_detailed_content(self, conversation: List[Dict[str, str]]) -> Dict[str, bool]:
+        """Detect which detailed content types are present in conversation."""
+        has_thinking = False
+        has_tool_results = False
+        has_tool_uses = False
+        has_system = False
+
+        for msg in conversation:
+            content = msg.get("content", "")
+            if "💭 Thinking:" in content:
+                has_thinking = True
+            if "📤 Tool Result:" in content:
+                has_tool_results = True
+            if "🔧 Using tool:" in content:
+                has_tool_uses = True
+            if msg.get("role") == "system":
+                has_system = True
+
+        return {
+            "thinking": has_thinking,
+            "tool_results": has_tool_results,
+            "tool_uses": has_tool_uses,
+            "system": has_system
+        }
+
+    def _wrap_collapsible_sections(self, content: str) -> str:
+        """Wrap detailed content sections in collapsible divs."""
+        import re
+
+        # Wrap thinking blocks
+        content = re.sub(
+            r'(💭 Thinking:.*?)(?=\n(?:📤 Tool Result:|🔧 Using tool:|$))',
+            r'<div class="collapsible-section section-thinking" onclick="this.classList.toggle(\'collapsed\')">\1</div>',
+            content,
+            flags=re.DOTALL
+        )
+
+        # Wrap tool results
+        content = re.sub(
+            r'(📤 Tool Result:.*?)(?=\n(?:💭 Thinking:|🔧 Using tool:|$))',
+            r'<div class="collapsible-section section-tool-result" onclick="this.classList.toggle(\'collapsed\')">\1</div>',
+            content,
+            flags=re.DOTALL
+        )
+
+        # Wrap tool uses
+        content = re.sub(
+            r'(🔧 Using tool:.*?)(?=\n(?:💭 Thinking:|📤 Tool Result:|$))',
+            r'<div class="collapsible-section section-tool-use" onclick="this.classList.toggle(\'collapsed\')">\1</div>',
+            content,
+            flags=re.DOTALL
+        )
+
+        return content
+
     def save_as_html(
         self, conversation: List[Dict[str, str]], session_id: str
     ) -> Optional[Path]:
         """Save conversation as HTML file with syntax highlighting."""
         if not conversation:
             return None
+
+        # Detect detailed content types
+        detailed_content = self._detect_detailed_content(conversation)
+        has_any_detailed = any(detailed_content.values())
 
         # Get timestamp from first message
         first_timestamp = conversation[0].get("timestamp", "")
@@ -570,6 +629,94 @@ class ClaudeConversationExtractor:
             font-style: italic;
             color: #24292e;
         }}
+
+        /* Toggle controls */
+        .toggle-bar {{
+            background: white;
+            padding: 15px 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }}
+        .toggle-bar h3 {{
+            margin: 0 0 10px 0;
+            font-size: 1em;
+            color: #555;
+        }}
+        .toggle-controls {{
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }}
+        .toggle-btn {{
+            padding: 8px 14px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background: #fff;
+            cursor: pointer;
+            font-size: 0.9em;
+            transition: all 0.2s;
+            user-select: none;
+        }}
+        .toggle-btn:hover {{
+            background: #f8f9fa;
+            border-color: #6c757d;
+            transform: translateY(-1px);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }}
+        .toggle-btn:active {{
+            transform: translateY(0);
+            box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+        }}
+
+        /* Collapsible sections */
+        .collapsible-section {{
+            border-left: 3px solid #dee2e6;
+            padding-left: 12px;
+            margin: 10px 0;
+            cursor: pointer;
+            transition: all 0.2s;
+        }}
+        .collapsible-section:hover {{
+            border-left-color: #adb5bd;
+            background: #f8f9fa;
+        }}
+        .collapsible-section.collapsed {{
+            max-height: 70px;
+            overflow: hidden;
+        }}
+        .collapsible-section.collapsed:after {{
+            content: " [Click to expand...]";
+            color: #6c757d;
+            font-style: italic;
+        }}
+        .section-thinking {{
+            border-left-color: #9b59b6;
+        }}
+        .section-tool-result {{
+            border-left-color: #e74c3c;
+        }}
+        .section-tool-use {{
+            border-left-color: #f39c12;
+        }}
+        .section-system {{
+            border-left-color: #95a5a6;
+        }}
+
+        /* System messages collapsible */
+        .message.system {{
+            cursor: pointer;
+        }}
+        .message.system.collapsed {{
+            max-height: 70px;
+            overflow: hidden;
+            position: relative;
+        }}
+        .message.system.collapsed:after {{
+            content: " [Click to expand...]";
+            color: #6c757d;
+            font-style: italic;
+        }}
     </style>
 </head>
 <body>
@@ -586,12 +733,38 @@ class ClaudeConversationExtractor:
         with open(output_path, "w", encoding="utf-8") as f:
             f.write(html_content)
 
+            # Add toggle bar if detailed content exists
+            if has_any_detailed:
+                f.write('    <div class="toggle-bar">\n')
+                f.write('        <h3>Quick Actions:</h3>\n')
+                f.write('        <div class="toggle-controls">\n')
+
+                if detailed_content["thinking"]:
+                    f.write('            <button class="toggle-btn" data-collapse="thinking">💭 Collapse Thinking</button>\n')
+
+                if detailed_content["tool_uses"]:
+                    f.write('            <button class="toggle-btn" data-collapse="tool-uses">🔧 Collapse Tool Uses</button>\n')
+
+                if detailed_content["tool_results"]:
+                    f.write('            <button class="toggle-btn" data-collapse="tool-results">📤 Collapse Tool Results</button>\n')
+
+                if detailed_content["system"]:
+                    f.write('            <button class="toggle-btn" data-collapse="system">ℹ️ Collapse System</button>\n')
+
+                f.write('            <button class="toggle-btn" onclick="document.querySelectorAll(\'.collapsible-section, .message.system\').forEach(el => el.classList.remove(\'collapsed\'))">✨ Expand All</button>\n')
+
+                f.write('        </div>\n')
+                f.write('    </div>\n')
+
             for msg in conversation:
                 role = msg["role"]
                 content = msg["content"]
 
                 # Format markdown to HTML with syntax highlighting
                 formatted_content = self._format_markdown_to_html(content)
+
+                # Wrap detailed sections in collapsible divs
+                formatted_content = self._wrap_collapsible_sections(formatted_content)
 
                 role_display = {
                     "user": "👤 User",
@@ -609,7 +782,84 @@ class ClaudeConversationExtractor:
             # Add Highlight.js script at the end for syntax highlighting
             f.write("""
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
-    <script>hljs.highlightAll();</script>
+    <script>
+        // Initialize syntax highlighting
+        hljs.highlightAll();
+
+        // Collapse all buttons - one-way action
+        document.querySelectorAll('[data-collapse]').forEach(btn => {
+            btn.addEventListener('click', function() {
+                const type = this.getAttribute('data-collapse');
+                let selector = '';
+
+                if (type === 'thinking') {
+                    selector = '.section-thinking';
+                } else if (type === 'tool-uses') {
+                    selector = '.section-tool-use';
+                } else if (type === 'tool-results') {
+                    selector = '.section-tool-result';
+                } else if (type === 'system') {
+                    selector = '.message.system';
+                }
+
+                // Collapse all sections of this type
+                if (selector) {
+                    document.querySelectorAll(selector).forEach(el => {
+                        el.classList.add('collapsed');
+                    });
+                }
+            });
+        });
+
+        // Individual sections toggle on click
+        document.querySelectorAll('.collapsible-section').forEach(section => {
+            section.addEventListener('click', function(e) {
+                this.classList.toggle('collapsed');
+            });
+        });
+
+        // System messages toggle on click
+        document.querySelectorAll('.message.system').forEach(msg => {
+            msg.addEventListener('click', function(e) {
+                this.classList.toggle('collapsed');
+            });
+        });
+
+        // Keyboard shortcuts for collapsing
+        document.addEventListener('keydown', function(e) {
+            // Alt+T to collapse all thinking
+            if (e.altKey && e.key === 't') {
+                e.preventDefault();
+                const btn = document.querySelector('[data-collapse="thinking"]');
+                if (btn) btn.click();
+            }
+            // Alt+U to collapse all tool uses
+            if (e.altKey && e.key === 'u') {
+                e.preventDefault();
+                const btn = document.querySelector('[data-collapse="tool-uses"]');
+                if (btn) btn.click();
+            }
+            // Alt+R to collapse all tool results
+            if (e.altKey && e.key === 'r') {
+                e.preventDefault();
+                const btn = document.querySelector('[data-collapse="tool-results"]');
+                if (btn) btn.click();
+            }
+            // Alt+S to collapse all system messages
+            if (e.altKey && e.key === 's') {
+                e.preventDefault();
+                const btn = document.querySelector('[data-collapse="system"]');
+                if (btn) btn.click();
+            }
+            // Alt+E to expand all
+            if (e.altKey && e.key === 'e') {
+                e.preventDefault();
+                document.querySelectorAll('.collapsible-section, .message.system').forEach(el => {
+                    el.classList.remove('collapsed');
+                });
+            }
+        });
+    </script>
 </body>
 </html>""")
 
