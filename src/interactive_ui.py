@@ -121,7 +121,8 @@ class InteractiveUI:
 
         # Display sessions
         for i, session_path in enumerate(self.sessions[:20], 1):  # Show max 20
-            project = session_path.parent.name
+            clean_name = self.extractor._get_clean_project_name(session_path)
+            project = clean_name.replace('__', ' / ')
             modified = datetime.fromtimestamp(session_path.stat().st_mtime)
             size_kb = session_path.stat().st_size / 1024
 

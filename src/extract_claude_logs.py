@@ -231,7 +231,8 @@ class ClaudeConversationExtractor:
             # Clear screen and show header
             print("\033[2J\033[H", end="")  # Clear screen
             print("=" * 60)
-            print(f"📄 Viewing: {jsonl_path.parent.name}")
+            project_name = self._get_clean_project_name(jsonl_path).replace('__', ' / ')
+            print(f"📄 Viewing: {project_name}")
             print(f"Session: {session_id[:8]}...")
             
             # Get timestamp from first message
@@ -306,6 +307,80 @@ class ClaudeConversationExtractor:
             print(f"❌ Error displaying conversation: {e}")
             input("\nPress Enter to continue...")
 
+    def _get_clean_project_name(self, session_path: Path) -> str:
+        """Extract a clean project name from the session path, excluding home directory.
+        
+        Reconstructs path segments by checking the filesystem to distinguish between
+        slashes (represented by __) and dashes within folder names.
+        """
+        project_name = session_path.parent.name
+        
+        # Sanitize and split the project name parts (Claude uses hyphens for separators)
+        raw_name = project_name.strip('-')
+        name_parts = raw_name.split('-')
+        
+        # Get home directory parts for comparison
+        home = Path.home()
+        home_parts = [p.strip(':/\\') for p in home.parts if p and p.strip(':/\\')]
+        
+        # Match home parts from the beginning to exclude them
+        match_idx = 0
+        offset = 0
+        # Skip Windows drive letter if present (e.g., 'c')
+        if len(name_parts) > 0 and len(name_parts[0]) == 1 and name_parts[0].isalpha():
+            offset = 1
+            
+        while match_idx < len(home_parts) and (match_idx + offset) < len(name_parts):
+            if name_parts[match_idx + offset].lower() == home_parts[match_idx].lower():
+                match_idx += 1
+            else:
+                break
+        
+        # Determine remaining parts and base path for filesystem check
+        if match_idx > 0:
+            remaining_parts = name_parts[match_idx + offset:]
+            current_path = home
+        else:
+            remaining_parts = name_parts
+            # If it started with -, it's likely an absolute path on Unix
+            current_path = Path('/') if project_name.startswith('-') else Path.cwd()
+            
+            # Check for Windows drive letter fallback
+            if len(remaining_parts) > 0 and len(remaining_parts[0]) == 1:
+                drive = remaining_parts[0] + ":\\"
+                try:
+                    if Path(drive).exists():
+                        current_path = Path(drive)
+                        remaining_parts = remaining_parts[1:]
+                except Exception:
+                    pass
+
+        if not remaining_parts:
+            return "home"
+            
+        # Identify real path segments by walking the filesystem
+        real_segments = []
+        temp_segment = []
+        
+        for part in remaining_parts:
+            temp_segment.append(part)
+            test_name = "-".join(temp_segment)
+            try:
+                test_path = current_path / test_name
+                if test_path.exists() and test_path.is_dir():
+                    real_segments.append(test_name)
+                    current_path = test_path
+                    temp_segment = []
+            except Exception:
+                pass
+        
+        # Add any leftover parts as the final segment
+        if temp_segment:
+            real_segments.append("-".join(temp_segment))
+            
+        # Join real segments with __ to represent slashes
+        return "__".join(real_segments)
+
     def save_as_markdown(
         self, conversation: List[Dict[str, str]], session_path: Path
     ) -> Optional[Path]:
@@ -314,7 +389,7 @@ class ClaudeConversationExtractor:
             return None
 
         # Extract project name and session ID from path
-        project_name = session_path.parent.name
+        project_name = self._get_clean_project_name(session_path)
         session_id = session_path.stem
         # Remove 'chat_' prefix if present
         if session_id.startswith('chat_'):
@@ -335,7 +410,7 @@ class ClaudeConversationExtractor:
             date_str = datetime.now().strftime("%Y-%m-%d")
             time_str = ""
 
-        filename = f"claude-conversation-{project_name}-{date_str}-{session_id[:8]}.md"
+        filename = f"claude-conversation__{project_name}__{date_str}__{session_id[:8]}.md"
         output_path = self.output_dir / filename
 
         with open(output_path, "w", encoding="utf-8") as f:
@@ -380,7 +455,7 @@ class ClaudeConversationExtractor:
             return None
 
         # Extract project name and session ID from path
-        project_name = session_path.parent.name
+        project_name = self._get_clean_project_name(session_path)
         session_id = session_path.stem
         # Remove 'chat_' prefix if present
         if session_id.startswith('chat_'):
@@ -397,7 +472,7 @@ class ClaudeConversationExtractor:
         else:
             date_str = datetime.now().strftime("%Y-%m-%d")
 
-        filename = f"claude-conversation-{project_name}-{date_str}-{session_id[:8]}.json"
+        filename = f"claude-conversation__{project_name}__{date_str}__{session_id[:8]}.json"
         output_path = self.output_dir / filename
 
         # Create JSON structure
@@ -529,7 +604,7 @@ class ClaudeConversationExtractor:
         has_any_detailed = any(detailed_content.values())
 
         # Extract project name and session ID from path
-        project_name = session_path.parent.name
+        project_name = self._get_clean_project_name(session_path)
         session_id = session_path.stem
         # Remove 'chat_' prefix if present
         if session_id.startswith('chat_'):
@@ -549,7 +624,7 @@ class ClaudeConversationExtractor:
             date_str = datetime.now().strftime("%Y-%m-%d")
             time_str = ""
 
-        filename = f"claude-conversation-{project_name}-{date_str}-{session_id[:8]}.html"
+        filename = f"claude-conversation__{project_name}__{date_str}__{session_id[:8]}.html"
         output_path = self.output_dir / filename
 
         # HTML template with modern styling and Highlight.js
@@ -1006,10 +1081,9 @@ class ClaudeConversationExtractor:
         # Show all sessions if no limit specified
         sessions_to_show = sessions[:limit] if limit else sessions
         for i, session in enumerate(sessions_to_show, 1):
-            # Clean up project name (remove hyphens, make readable)
-            project = session.parent.name.replace('-', ' ').strip()
-            if project.startswith("Users"):
-                project = "~/" + "/".join(project.split()[2:]) if len(project.split()) > 2 else "Home"
+            # Clean up project name (remove hyphens, exclude home path)
+            clean_name = self._get_clean_project_name(session)
+            project = clean_name.replace('__', ' / ').strip()
             
             session_id = session.stem
             modified = datetime.fromtimestamp(session.stat().st_mtime)
@@ -1231,7 +1305,8 @@ Examples:
         file_paths_list = []
         for file_path, file_results in results_by_file.items():
             file_paths_list.append(file_path)
-            print(f"\n{len(file_paths_list)}. 📄 {file_path.parent.name} ({len(file_results)} matches)")
+            project_name = extractor._get_clean_project_name(file_path).replace('__', ' / ')
+            print(f"\n{len(file_paths_list)}. 📄 {project_name} ({len(file_results)} matches)")
             # Show first match preview
             first = file_results[0]
             print(f"   {first.speaker}: {first.matched_content[:100]}...")
