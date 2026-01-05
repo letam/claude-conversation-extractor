@@ -85,7 +85,7 @@ class ClaudeConversationExtractor:
                             msg = entry["message"]
                             if isinstance(msg, dict) and msg.get("role") == "user":
                                 content = msg.get("content", "")
-                                text = self._extract_text_content(content)
+                                text = self._extract_text_content(content, detailed=detailed)
 
                                 if text and text.strip():
                                     conversation.append(
@@ -189,6 +189,23 @@ class ClaudeConversationExtractor:
                         tool_input = item.get("input", {})
                         text_parts.append(f"\n🔧 Using tool: {tool_name}")
                         text_parts.append(f"Input: {json.dumps(tool_input, indent=2)}\n")
+                    elif detailed and item.get("type") == "tool_result":
+                        # Include tool results in detailed mode (e.g., agent outputs)
+                        tool_use_id = item.get("tool_use_id", "")
+                        result_content = item.get("content", "")
+
+                        # Tool result content can be a string or nested array
+                        if isinstance(result_content, list):
+                            # Extract text from nested content
+                            result_text = self._extract_text_content(result_content, detailed=True)
+                        else:
+                            result_text = str(result_content)
+
+                        if result_text:
+                            text_parts.append(f"\n📤 Tool Result:")
+                            if tool_use_id:
+                                text_parts.append(f"Tool Use ID: {tool_use_id}")
+                            text_parts.append(result_text)
             return "\n".join(text_parts)
         else:
             return str(content)
