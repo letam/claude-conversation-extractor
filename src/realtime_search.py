@@ -204,7 +204,7 @@ class TerminalDisplay:
 
                 # Show result info
                 date_str = result.timestamp.strftime("%Y-%m-%d")
-                clean_name = self.extractor._get_clean_project_name(Path(result.file_path))
+                clean_name = self.extractor.get_clean_project_name(Path(result.file_path))
                 project = clean_name.replace('__', ' / ')[:20]
 
                 # Highlight matching text

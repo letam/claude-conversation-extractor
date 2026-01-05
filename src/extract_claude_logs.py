@@ -231,7 +231,7 @@ class ClaudeConversationExtractor:
             # Clear screen and show header
             print("\033[2J\033[H", end="")  # Clear screen
             print("=" * 60)
-            project_name = self._get_clean_project_name(jsonl_path).replace('__', ' / ')
+            project_name = self.get_clean_project_name(jsonl_path).replace('__', ' / ')
             print(f"📄 Viewing: {project_name}")
             print(f"Session: {session_id[:8]}...")
             
@@ -307,7 +307,7 @@ class ClaudeConversationExtractor:
             print(f"❌ Error displaying conversation: {e}")
             input("\nPress Enter to continue...")
 
-    def _get_clean_project_name(self, session_path: Path) -> str:
+    def get_clean_project_name(self, session_path: Path) -> str:
         """Extract a clean project name from the session path, excluding home directory.
         
         Reconstructs path segments by checking the filesystem to distinguish between
@@ -389,7 +389,7 @@ class ClaudeConversationExtractor:
             return None
 
         # Extract project name and session ID from path
-        project_name = self._get_clean_project_name(session_path)
+        project_name = self.get_clean_project_name(session_path)
         session_id = session_path.stem
         # Remove 'chat_' prefix if present
         if session_id.startswith('chat_'):
@@ -455,7 +455,7 @@ class ClaudeConversationExtractor:
             return None
 
         # Extract project name and session ID from path
-        project_name = self._get_clean_project_name(session_path)
+        project_name = self.get_clean_project_name(session_path)
         session_id = session_path.stem
         # Remove 'chat_' prefix if present
         if session_id.startswith('chat_'):
@@ -604,7 +604,7 @@ class ClaudeConversationExtractor:
         has_any_detailed = any(detailed_content.values())
 
         # Extract project name and session ID from path
-        project_name = self._get_clean_project_name(session_path)
+        project_name = self.get_clean_project_name(session_path)
         session_id = session_path.stem
         # Remove 'chat_' prefix if present
         if session_id.startswith('chat_'):
@@ -1082,7 +1082,7 @@ class ClaudeConversationExtractor:
         sessions_to_show = sessions[:limit] if limit else sessions
         for i, session in enumerate(sessions_to_show, 1):
             # Clean up project name (remove hyphens, exclude home path)
-            clean_name = self._get_clean_project_name(session)
+            clean_name = self.get_clean_project_name(session)
             project = clean_name.replace('__', ' / ').strip()
             
             session_id = session.stem
@@ -1305,7 +1305,7 @@ Examples:
         file_paths_list = []
         for file_path, file_results in results_by_file.items():
             file_paths_list.append(file_path)
-            project_name = extractor._get_clean_project_name(file_path).replace('__', ' / ')
+            project_name = extractor.get_clean_project_name(file_path).replace('__', ' / ')
             print(f"\n{len(file_paths_list)}. 📄 {project_name} ({len(file_results)} matches)")
             # Show first match preview
             first = file_results[0]
