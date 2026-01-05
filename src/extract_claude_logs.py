@@ -474,9 +474,12 @@ class ClaudeConversationExtractor:
         """Wrap detailed content sections in collapsible divs."""
         import re
 
+        # Pattern to match any section marker
+        section_marker = r'(?:💭 Thinking:|📤 Tool Result:|🔧 Using tool:)'
+
         # Wrap thinking blocks
         content = re.sub(
-            r'(💭 Thinking:.*?)(?=\n(?:📤 Tool Result:|🔧 Using tool:|$))',
+            rf'(💭 Thinking:.*?)(?=\n{section_marker}|$)',
             r'<div class="collapsible-section section-thinking" onclick="this.classList.toggle(\'collapsed\')">\1</div>',
             content,
             flags=re.DOTALL
@@ -484,7 +487,7 @@ class ClaudeConversationExtractor:
 
         # Wrap tool results
         content = re.sub(
-            r'(📤 Tool Result:.*?)(?=\n(?:💭 Thinking:|🔧 Using tool:|$))',
+            rf'(📤 Tool Result:.*?)(?=\n{section_marker}|$)',
             r'<div class="collapsible-section section-tool-result" onclick="this.classList.toggle(\'collapsed\')">\1</div>',
             content,
             flags=re.DOTALL
@@ -492,7 +495,7 @@ class ClaudeConversationExtractor:
 
         # Wrap tool uses
         content = re.sub(
-            r'(🔧 Using tool:.*?)(?=\n(?:💭 Thinking:|📤 Tool Result:|$))',
+            rf'(🔧 Using tool:.*?)(?=\n{section_marker}|$)',
             r'<div class="collapsible-section section-tool-use" onclick="this.classList.toggle(\'collapsed\')">\1</div>',
             content,
             flags=re.DOTALL
