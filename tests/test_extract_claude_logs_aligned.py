@@ -198,7 +198,8 @@ class TestClaudeConversationExtractor(unittest.TestCase):
             },
         ]
 
-        output_path = self.extractor.save_as_markdown(conversation, "test_session")
+        session_path = Path("test_project/chat_test_session.jsonl")
+        output_path = self.extractor.save_as_markdown(conversation, session_path)
 
         self.assertTrue(output_path.exists())
         content = output_path.read_text()
@@ -209,7 +210,8 @@ class TestClaudeConversationExtractor(unittest.TestCase):
 
     def test_save_as_markdown_empty_conversation(self):
         """Test saving empty conversation"""
-        result = self.extractor.save_as_markdown([], "empty_session")
+        session_path = Path("test_project/chat_empty_session.jsonl")
+        result = self.extractor.save_as_markdown([], session_path)
         self.assertIsNone(result)
 
     def test_save_as_markdown_no_timestamp(self):
@@ -219,7 +221,8 @@ class TestClaudeConversationExtractor(unittest.TestCase):
             {"role": "assistant", "content": "Hi!", "timestamp": ""},
         ]
 
-        output_path = self.extractor.save_as_markdown(conversation, "no_time")
+        session_path = Path("test_project/chat_no_time.jsonl")
+        output_path = self.extractor.save_as_markdown(conversation, session_path)
         self.assertTrue(output_path.exists())
         content = output_path.read_text()
         # Should use current date
@@ -231,7 +234,8 @@ class TestClaudeConversationExtractor(unittest.TestCase):
             {"role": "user", "content": "Hello", "timestamp": "invalid-date"}
         ]
 
-        output_path = self.extractor.save_as_markdown(conversation, "bad_time")
+        session_path = Path("test_project/chat_bad_time.jsonl")
+        output_path = self.extractor.save_as_markdown(conversation, session_path)
         self.assertTrue(output_path.exists())
         # Should handle gracefully and use current date
         content = output_path.read_text()

@@ -56,7 +56,9 @@ class TestClaudeConversationExtractor(unittest.TestCase):
 
     def test_save_as_markdown_empty_conversation(self):
         """Test saving empty conversation returns None"""
-        result = self.extractor.save_as_markdown([], "test-session")
+        from pathlib import Path
+        session_path = Path("test_project/chat_test-session.jsonl")
+        result = self.extractor.save_as_markdown([], session_path)
         self.assertIsNone(result)
 
     def test_save_as_markdown_with_conversation(self):
@@ -74,7 +76,9 @@ class TestClaudeConversationExtractor(unittest.TestCase):
             },
         ]
 
-        result = self.extractor.save_as_markdown(conversation, "test-session-id")
+        from pathlib import Path
+        session_path = Path("test_project/chat_test-session-id.jsonl")
+        result = self.extractor.save_as_markdown(conversation, session_path)
 
         self.assertIsNotNone(result)
         self.assertTrue(result.exists())

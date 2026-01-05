@@ -105,7 +105,9 @@ class TestClaudeConversationExtractorComprehensive(unittest.TestCase):
             },
         ]
 
-        output_path = self.extractor.save_as_markdown(conversation, "test_session")
+        from pathlib import Path
+        session_path = Path("test_project/chat_test_session.jsonl")
+        output_path = self.extractor.save_as_markdown(conversation, session_path)
 
         self.assertTrue(output_path.exists())
         content = output_path.read_text()
@@ -125,7 +127,9 @@ class TestClaudeConversationExtractorComprehensive(unittest.TestCase):
             },
         ]
 
-        output_path = self.extractor.save_as_markdown(conversation, "code_session")
+        from pathlib import Path
+        session_path = Path("test_project/chat_code_session.jsonl")
+        output_path = self.extractor.save_as_markdown(conversation, session_path)
         content = output_path.read_text()
 
         # Should preserve code blocks

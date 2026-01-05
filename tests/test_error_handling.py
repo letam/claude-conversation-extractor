@@ -61,9 +61,12 @@ class TestErrorHandling(unittest.TestCase):
         extractor = ClaudeConversationExtractor(self.temp_dir)
         conversation = [{"role": "user", "content": "Test", "timestamp": ""}]
 
+        from pathlib import Path
+        session_path = Path("test_project/chat_test.jsonl")
+
         with patch("builtins.open", side_effect=IOError("Disk full")):
             # Should handle error gracefully
-            _ = extractor.save_as_markdown(conversation, "test")
+            _ = extractor.save_as_markdown(conversation, session_path)
             # The current implementation doesn't catch this, but it should
 
     def test_list_recent_sessions_no_sessions_messages(self):
