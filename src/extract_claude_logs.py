@@ -164,10 +164,10 @@ class ClaudeConversationExtractor:
 
     def _extract_text_content(self, content, detailed: bool = False) -> str:
         """Extract text from various content formats Claude uses.
-        
+
         Args:
             content: The content to extract from
-            detailed: If True, include tool use blocks and other metadata
+            detailed: If True, include tool use blocks, thinking, and other metadata
         """
         if isinstance(content, str):
             return content
@@ -178,6 +178,11 @@ class ClaudeConversationExtractor:
                 if isinstance(item, dict):
                     if item.get("type") == "text":
                         text_parts.append(item.get("text", ""))
+                    elif detailed and item.get("type") == "thinking":
+                        # Include thinking blocks in detailed mode (verbose mode)
+                        thinking = item.get("thinking", "")
+                        if thinking:
+                            text_parts.append(f"\n💭 Thinking:\n{thinking}\n")
                     elif detailed and item.get("type") == "tool_use":
                         # Include tool use details in detailed mode
                         tool_name = item.get("name", "unknown")
